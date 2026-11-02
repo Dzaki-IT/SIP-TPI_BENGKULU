@@ -19,12 +19,14 @@
                 <i class="bi bi-tools text-primary"></i> Data Alat Penangkapan Ikan (API)
             </h4>
         </div>
+        @can('create', \App\Models\AlatTangkap::class)
         <div>
             <a href="{{ route('alat-tangkap.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-plus-lg"></i>
                 <span class="fw-semibold">Tambah Alat Tangkap</span>
             </a>
         </div>
+        @endcan
     </div>
 
     <!-- Filter & Search Card -->
@@ -90,9 +92,12 @@
                         <th style="width: 140px;">Kode Alat</th>
                         <th>Nama Alat Penangkapan Ikan</th>
                         <th>Kategori / Golongan</th>
+                        <th>Pemilik / Nelayan</th>
                         <th class="text-center" style="width: 150px;">Frekuensi Digunakan</th>
                         <th class="text-center" style="width: 120px;">Status</th>
+                        @can('create', \App\Models\AlatTangkap::class)
                         <th class="text-center" style="width: 140px;">Aksi</th>
+                        @endcan
                     </tr>
                 </thead>
                 <tbody>
@@ -118,6 +123,14 @@
                                     <span class="text-muted small">-</span>
                                 @endif
                             </td>
+                            <td>
+                                @if($alat->nelayan)
+                                    <div class="fw-semibold text-dark">{{ $alat->nelayan->nama }}</div>
+                                    <small class="text-muted">{{ $alat->nelayan->kode_nelayan }}</small>
+                                @else
+                                    <span class="text-muted small">Belum terhubung</span>
+                                @endif
+                            </td>
                             <td class="text-center">
                                 <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Digunakan dalam pendaratan">
                                     <i class="bi bi-journal-check me-1"></i>{{ $alat->pendaratan_count }}x Pendaratan
@@ -134,11 +147,15 @@
                                     </span>
                                 @endif
                             </td>
+                            @can('create', \App\Models\AlatTangkap::class)
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
+                                    @can('update', $alat)
                                     <a href="{{ route('alat-tangkap.edit', $alat) }}" class="btn btn-sm btn-outline-warning text-dark" title="Edit Data">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
+                                    @endcan
+                                    @can('delete', $alat)
                                     <form action="{{ route('alat-tangkap.destroy', $alat) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus alat tangkap \'{{ $alat->nama_alat }}\'? Data yang sedang digunakan dalam pendaratan tidak dapat dihapus.');">
                                         @csrf
                                         @method('DELETE')
@@ -146,12 +163,14 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
+                            @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="{{ auth()->user()?->can('create', \App\Models\AlatTangkap::class) ? 8 : 7 }}" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="bi bi-tools display-6 d-block mb-2"></i>
                                     <span class="fw-semibold">Tidak ada data alat tangkap ditemukan.</span>

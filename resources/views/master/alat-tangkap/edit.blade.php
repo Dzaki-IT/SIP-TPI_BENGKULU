@@ -74,6 +74,22 @@
                             @enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label for="nelayan_id" class="form-label fw-semibold">Pemilik / Nelayan Terdaftar</label>
+                            <select name="nelayan_id" id="nelayan_id" class="form-select @error('nelayan_id') is-invalid @enderror">
+                                <option value="">-- Pilih Nelayan Pemilik (Opsional) --</option>
+                                @foreach($nelayanList as $nelayan)
+                                    <option value="{{ $nelayan->id }}" {{ old('nelayan_id', $alatTangkap->nelayan_id) == $nelayan->id ? 'selected' : '' }}>
+                                        {{ $nelayan->nama }} ({{ $nelayan->kode_nelayan }}) - {{ $nelayan->tpi->nama_tpi ?? 'Non-Pangkalan' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Pemilik dapat diubah atau dikosongkan jika alat tangkap belum terhubung.</small>
+                            @error('nelayan_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         <div class="mb-4">
                             <label for="is_active" class="form-label fw-semibold">Status Penggunaan <span class="text-danger">*</span></label>
                             <select name="is_active" id="is_active" class="form-select @error('is_active') is-invalid @enderror" required>

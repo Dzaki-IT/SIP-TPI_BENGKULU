@@ -10,6 +10,7 @@ use App\Models\Nelayan;
 use App\Models\Pendaratan;
 use App\Models\Tpi;
 use App\Models\User;
+use App\Models\VerificationHistory;
 use App\Models\Wilayah;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,13 +20,21 @@ class PendaratanAndVerifikasiTest extends TestCase
     use RefreshDatabase;
 
     protected User $adminTpi;
+
     protected User $verifikator;
+
     protected User $pimpinan;
+
     protected Tpi $tpi;
+
     protected Nelayan $nelayan;
+
     protected Kapal $kapal;
+
     protected AlatTangkap $alatTangkap;
+
     protected JenisIkan $ikan1;
+
     protected JenisIkan $ikan2;
 
     protected function setUp(): void
@@ -91,6 +100,7 @@ class PendaratanAndVerifikasiTest extends TestCase
             'kode_alat' => 'API-001',
             'nama_alat' => 'Pukat Cincin (Purse Seine)',
             'jenis_kategori' => 'Jaring',
+            'nelayan_id' => $this->nelayan->id,
             'is_active' => true,
         ]);
 
@@ -202,6 +212,12 @@ class PendaratanAndVerifikasiTest extends TestCase
 
         $pendaratan = Pendaratan::first();
         $this->assertEquals('diajukan', $pendaratan->status_verifikasi);
+        $this->assertDatabaseHas('verification_histories', [
+            'pendaratan_id' => $pendaratan->id,
+            'actor_id' => $this->adminTpi->id,
+            'action' => 'diajukan',
+            'to_status' => 'diajukan',
+        ]);
         $response->assertRedirect(route('pendaratan.show', $pendaratan));
     }
 
@@ -245,6 +261,13 @@ class PendaratanAndVerifikasiTest extends TestCase
         $this->assertEquals($this->verifikator->id, $pendaratan->verified_by);
         $this->assertNotNull($pendaratan->verified_at);
         $this->assertEquals('Semua data dan nota lelang telah sesuai.', $pendaratan->catatan_verifikasi);
+        $this->assertDatabaseHas('verification_histories', [
+            'pendaratan_id' => $pendaratan->id,
+            'actor_id' => $this->verifikator->id,
+            'action' => 'disetujui',
+            'from_status' => 'diajukan',
+            'to_status' => 'diverifikasi',
+        ]);
 
         $response->assertRedirect(route('verifikasi.index'));
     }
@@ -270,6 +293,13 @@ class PendaratanAndVerifikasiTest extends TestCase
         $this->assertEquals($this->verifikator->id, $pendaratan->verified_by);
         $this->assertNotNull($pendaratan->verified_at);
         $this->assertEquals('Volume tongkol melebihi kapasitas palka, mohon periksa ulang.', $pendaratan->catatan_verifikasi);
+        $this->assertDatabaseHas('verification_histories', [
+            'pendaratan_id' => $pendaratan->id,
+            'actor_id' => $this->verifikator->id,
+            'action' => 'ditolak',
+            'from_status' => 'diajukan',
+            'to_status' => 'ditolak',
+        ]);
 
         $response->assertRedirect(route('verifikasi.index'));
     }
@@ -310,9 +340,9 @@ class PendaratanAndVerifikasiTest extends TestCase
         $this->post(route('verifikasi.approve', $pendaratan))->assertForbidden();
         $this->post(route('verifikasi.reject', $pendaratan), ['catatan_verifikasi' => 'Tolak'])->assertForbidden();
 
-        // Pimpinan can view verifikasi index but cannot approve/reject
+        // Pimpinan cannot access the verification workspace.
         $this->actingAs($this->pimpinan);
-        $this->get(route('verifikasi.index'))->assertOk();
+        $this->get(route('verifikasi.index'))->assertForbidden();
         $this->post(route('verifikasi.approve', $pendaratan))->assertForbidden();
         $this->post(route('verifikasi.reject', $pendaratan), ['catatan_verifikasi' => 'Catatan revisi'])->assertForbidden();
     }
@@ -347,7 +377,7 @@ class PendaratanAndVerifikasiTest extends TestCase
                 ],
             ],
         ])->assertRedirect(route('pendaratan.show', $pendaratan))
-          ->assertSessionHas('error');
+            ->assertSessionHas('error');
 
         // Delete should redirect with error
         $this->delete(route('pendaratan.destroy', $pendaratan))
@@ -418,7 +448,52 @@ class PendaratanAndVerifikasiTest extends TestCase
 
         $pendaratan->refresh();
         $this->assertEquals('diajukan', $pendaratan->status_verifikasi);
+        $this->assertNull($pendaratan->verified_by);
+        $this->assertNull($pendaratan->verified_at);
+        $this->assertNull($pendaratan->catatan_verifikasi);
+        $this->assertSame(1, VerificationHistory::where('pendaratan_id', $pendaratan->id)->where('action', 'diajukan')->count());
         $this->assertEquals(150, $pendaratan->detailPendaratan->first()->volume_kg);
         $response->assertRedirect(route('pendaratan.show', $pendaratan));
+    }
+
+    public function test_admin_cannot_store_duplicate_fish_or_cross_tpi_reference_data(): void
+    {
+        $otherTpi = Tpi::create([
+            'kode_tpi' => 'TPI-002',
+            'nama_tpi' => 'TPI Lain',
+            'wilayah_id' => $this->tpi->wilayah_id,
+            'status_operasi' => 'aktif',
+        ]);
+        $otherNelayan = Nelayan::create([
+            'kode_nelayan' => 'NL-002',
+            'nama' => 'Nelayan TPI Lain',
+            'tpi_id' => $otherTpi->id,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->adminTpi)
+            ->post(route('pendaratan.store'), [
+                'tpi_id' => $otherTpi->id,
+                'tanggal_pendaratan' => now()->toDateString(),
+                'nelayan_id' => $otherNelayan->id,
+                'action' => 'draft',
+                'items' => [
+                    ['jenis_ikan_id' => $this->ikan1->id, 'volume_kg' => 10],
+                    ['jenis_ikan_id' => $this->ikan1->id, 'volume_kg' => 20],
+                ],
+            ])
+            ->assertSessionHasErrors('items.0.jenis_ikan_id');
+
+        $this->actingAs($this->adminTpi)
+            ->post(route('pendaratan.store'), [
+                'tpi_id' => $otherTpi->id,
+                'tanggal_pendaratan' => now()->toDateString(),
+                'nelayan_id' => $otherNelayan->id,
+                'action' => 'draft',
+                'items' => [
+                    ['jenis_ikan_id' => $this->ikan1->id, 'volume_kg' => 10],
+                ],
+            ])
+            ->assertSessionHasErrors('nelayan_id');
     }
 }

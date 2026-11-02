@@ -2,15 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\AlatTangkap;
-use App\Models\DetailPendaratan;
-use App\Models\JenisIkan;
-use App\Models\Kapal;
-use App\Models\Nelayan;
-use App\Models\Pendaratan;
 use App\Models\Tpi;
 use App\Models\User;
-use App\Models\Wilayah;
 use Carbon\Carbon;
 use Database\Seeders\AlatTangkapSeeder;
 use Database\Seeders\JenisIkanSeeder;
@@ -26,9 +19,13 @@ class DashboardAndLaporanTest extends TestCase
     use RefreshDatabase;
 
     protected User $adminTpi;
+
     protected User $verifikator;
+
     protected User $pimpinan;
+
     protected Tpi $tpiPulauBaai;
+
     protected Tpi $tpiBinaKarya;
 
     protected function setUp(): void
@@ -191,32 +188,33 @@ class DashboardAndLaporanTest extends TestCase
     }
 
     /**
-     * Test CSV export returns 200 with text/csv content type and UTF-8 BOM.
+     * Test Excel export returns a formatted spreadsheet response.
      */
-    public function test_csv_export_returns_200_with_text_csv_content_type(): void
+    public function test_excel_export_returns_200_with_spreadsheet_content_type(): void
     {
         $this->actingAs($this->verifikator);
 
         // 1. Export Rekap TPI
         $responseTpi = $this->get(route('laporan.export', ['tipe' => 'tpi']));
         $responseTpi->assertOk();
-        $this->assertStringContainsString('text/csv', $responseTpi->headers->get('content-type'));
+        $this->assertStringContainsString('application/vnd.ms-excel', $responseTpi->headers->get('content-type'));
         $this->assertStringContainsString('attachment;', $responseTpi->headers->get('content-disposition'));
+        $responseTpi->assertSee('<table', false);
 
         // 2. Export Rekap Komoditas Ikan
         $responseIkan = $this->get(route('laporan.export', ['tipe' => 'ikan']));
         $responseIkan->assertOk();
-        $this->assertStringContainsString('text/csv', $responseIkan->headers->get('content-type'));
+        $this->assertStringContainsString('application/vnd.ms-excel', $responseIkan->headers->get('content-type'));
 
         // 3. Export Standar DKP Bengkulu
         $responseDkp = $this->get(route('laporan.export', ['tipe' => 'dkp']));
         $responseDkp->assertOk();
-        $this->assertStringContainsString('text/csv', $responseDkp->headers->get('content-type'));
+        $this->assertStringContainsString('application/vnd.ms-excel', $responseDkp->headers->get('content-type'));
 
         // 4. Export Standar Triwulanan BPS
         $responseTw = $this->get(route('laporan.export', ['tipe' => 'triwulan']));
         $responseTw->assertOk();
-        $this->assertStringContainsString('text/csv', $responseTw->headers->get('content-type'));
+        $this->assertStringContainsString('application/vnd.ms-excel', $responseTw->headers->get('content-type'));
     }
 
     /**

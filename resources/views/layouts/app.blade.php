@@ -317,8 +317,8 @@
                     </a>
                 </li>
 
-                @if(in_array($currentUser?->role, ['verifikator', 'pimpinan']))
-                <!-- Verifikasi Data (Verifikator & Pimpinan) -->
+                @if($currentUser?->isVerifikator())
+                <!-- Verifikasi Data (Verifikator only) -->
                 <li class="nav-item">
                     <a href="{{ route('verifikasi.index') }}" class="nav-link d-flex align-items-center justify-content-between {{ request()->routeIs('verifikasi.*') ? 'active' : '' }}">
                         <div class="d-flex align-items-center">
@@ -349,6 +349,18 @@
                     <a href="{{ route('laporan.index', ['tab' => 'ikan']) }}" class="nav-link {{ request()->routeIs('laporan.*') && request('tab') === 'ikan' ? 'active' : '' }}">
                         <i class="bi bi-file-earmark-bar-graph"></i>
                         <span>Laporan Produksi</span>
+                    </a>
+                </li>
+            </ul>
+            @endif
+
+            @if($currentUser?->isPimpinan())
+            <div class="sidebar-section-title">Administrasi Sistem</div>
+            <ul class="sidebar-nav">
+                <li class="nav-item">
+                    <a href="{{ route('akun.index') }}" class="nav-link {{ request()->routeIs('akun.*') ? 'active' : '' }}">
+                        <i class="bi bi-person-gear"></i>
+                        <span>Manajemen Akun</span>
                     </a>
                 </li>
             </ul>

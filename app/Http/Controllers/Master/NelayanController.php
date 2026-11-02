@@ -18,12 +18,14 @@ class NelayanController extends Controller
      */
     public function index(Request $request): View
     {
-        $user = Auth::user();
-        $query = Nelayan::with('tpi')->withCount(['kapal', 'pendaratan']);
+        $this->authorize('viewAny', Nelayan::class);
 
-        // Default or filter TPI for admin_tpi
-        if ($user && $user->role === 'admin_tpi' && $user->tpi_id) {
-            $query->where('tpi_id', $user->tpi_id);
+        $user = Auth::user();
+        $query = Nelayan::with('tpi')->withCount(['kapal', 'alatTangkap', 'pendaratan']);
+
+        // Admin TPI can only view data from their assigned TPI.
+        if ($user?->isAdminTpi()) {
+            $query->where('tpi_id', $user->tpi_id ?? 0);
         } elseif ($request->filled('tpi_id')) {
             $query->where('tpi_id', $request->tpi_id);
         }
@@ -32,9 +34,9 @@ class NelayanController extends Controller
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('kode_nelayan', 'like', "%{$search}%")
-                  ->orWhere('nik', 'like', "%{$search}%")
-                  ->orWhere('kelompok_nelayan', 'like', "%{$search}%");
+                    ->orWhere('kode_nelayan', 'like', "%{$search}%")
+                    ->orWhere('nik', 'like', "%{$search}%")
+                    ->orWhere('kelompok_nelayan', 'like', "%{$search}%");
             });
         }
 
@@ -53,9 +55,14 @@ class NelayanController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', Nelayan::class);
+
         $user = Auth::user();
-        $tpiList = Tpi::aktif()->orderBy('nama_tpi')->get();
-        $defaultTpiId = ($user && $user->role === 'admin_tpi') ? $user->tpi_id : null;
+        $tpiList = Tpi::aktif()
+            ->when($user?->isAdminTpi(), fn ($query) => $query->whereKey($user->tpi_id))
+            ->orderBy('nama_tpi')
+            ->get();
+        $defaultTpiId = $user?->isAdminTpi() ? $user->tpi_id : null;
 
         return view('master.nelayan.create', compact('tpiList', 'defaultTpiId'));
     }
@@ -65,10 +72,11 @@ class NelayanController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Nelayan::class);
+
         $user = Auth::user();
 
-        // If admin_tpi with tpi_id, enforce or default tpi_id
-        if ($user && $user->role === 'admin_tpi' && $user->tpi_id && !$request->filled('tpi_id')) {
+        if ($user?->isAdminTpi()) {
             $request->merge(['tpi_id' => $user->tpi_id]);
         }
 
@@ -101,7 +109,9 @@ class NelayanController extends Controller
      */
     public function show(Nelayan $nelayan): RedirectResponse
     {
-        return redirect()->route('nelayan.edit', $nelayan);
+        $this->authorize('view', $nelayan);
+
+        return redirect()->route('nelayan.index');
     }
 
     /**
@@ -109,7 +119,13 @@ class NelayanController extends Controller
      */
     public function edit(Nelayan $nelayan): View
     {
-        $tpiList = Tpi::aktif()->orderBy('nama_tpi')->get();
+        $this->authorize('update', $nelayan);
+
+        $user = Auth::user();
+        $tpiList = Tpi::aktif()
+            ->when($user?->isAdminTpi(), fn ($query) => $query->whereKey($user->tpi_id))
+            ->orderBy('nama_tpi')
+            ->get();
 
         return view('master.nelayan.edit', compact('nelayan', 'tpiList'));
     }
@@ -119,6 +135,13 @@ class NelayanController extends Controller
      */
     public function update(Request $request, Nelayan $nelayan): RedirectResponse
     {
+        $this->authorize('update', $nelayan);
+
+        $user = Auth::user();
+        if ($user?->isAdminTpi()) {
+            $request->merge(['tpi_id' => $user->tpi_id]);
+        }
+
         $validated = $request->validate([
             'kode_nelayan' => ['required', 'string', 'max:20', Rule::unique('nelayan', 'kode_nelayan')->ignore($nelayan->id)],
             'nama' => ['required', 'string', 'max:100'],
@@ -148,12 +171,18 @@ class NelayanController extends Controller
      */
     public function destroy(Nelayan $nelayan): RedirectResponse
     {
+        $this->authorize('delete', $nelayan);
+
         if ($nelayan->pendaratan()->exists()) {
             return redirect()->route('nelayan.index')->with('error', "Nelayan '{$nelayan->nama}' tidak dapat dihapus karena memiliki riwayat pendaratan aktif.");
         }
 
         if ($nelayan->kapal()->exists()) {
             return redirect()->route('nelayan.index')->with('error', "Nelayan '{$nelayan->nama}' tidak dapat dihapus karena masih terdaftar sebagai pemilik kapal.");
+        }
+
+        if ($nelayan->alatTangkap()->exists()) {
+            return redirect()->route('nelayan.index')->with('error', "Nelayan '{$nelayan->nama}' tidak dapat dihapus karena masih terdaftar sebagai pemilik alat tangkap.");
         }
 
         $nama = $nelayan->nama;

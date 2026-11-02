@@ -31,7 +31,7 @@
 
     <!-- Verifier Decision Card (Prominent at Top for Actionable Workflow) -->
     @if($pendaratan->status_verifikasi === 'diajukan')
-        @if(auth()->user()?->isVerifikator())
+        @can('verify', $pendaratan)
         <div class="card card-custom border-warning border-2 shadow-sm mb-4">
             <div class="card-header bg-warning bg-opacity-10 py-3 border-bottom border-warning border-opacity-25">
                 <div class="d-flex align-items-center justify-content-between">
@@ -84,7 +84,7 @@
                 <div class="small text-muted">Akun Anda berstatus peninjau (Pimpinan). Keputusan persetujuan dan penolakan hanya dapat dilakukan oleh akun dengan peran Verifikator.</div>
             </div>
         </div>
-        @endif
+        @endcan
     @elseif($pendaratan->status_verifikasi === 'diverifikasi')
         <div class="alert alert-success shadow-sm border-success d-flex align-items-center gap-3 p-3 mb-4">
             <i class="bi bi-check-circle-fill fs-2 text-success"></i>
@@ -280,7 +280,7 @@
 </div>
 
 <!-- Rejection Modal -->
-@if($pendaratan->status_verifikasi === 'diajukan' && auth()->user()?->isVerifikator())
+@can('verify', $pendaratan)
 <div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -320,6 +320,6 @@
         </div>
     </div>
 </div>
-@endif
+@endcan
 
 @endsection

@@ -20,9 +20,9 @@
 
         <!-- Action Buttons (Export & Print) -->
         <div class="d-flex align-items-center gap-2">
-            <a id="btnExportCsv" href="{{ route('laporan.export', array_merge(request()->all(), ['tipe' => $activeTab])) }}" class="btn btn-outline-success btn-sm px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-2">
+            <a id="btnExportExcel" href="{{ route('laporan.export', array_merge(request()->all(), ['tipe' => $activeTab])) }}" class="btn btn-outline-success btn-sm px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-2">
                 <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-6"></i>
-                <span>Ekspor CSV / Excel</span>
+                <span>Ekspor Excel</span>
             </a>
             <a id="btnCetakDoc" href="{{ route('laporan.cetak', array_merge(request()->all(), ['tipe' => $activeTab])) }}" target="_blank" class="btn btn-primary btn-sm px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-2">
                 <i class="bi bi-printer-fill fs-6"></i>
@@ -208,6 +208,11 @@
                 <!-- TAB 1: REKAPITULASI PER TPI                           -->
                 <!-- ===================================================== -->
                 <div class="tab-pane fade {{ $activeTab === 'tpi' ? 'show active' : '' }}" id="tab-tpi" role="tabpanel" aria-labelledby="tab-tpi-btn">
+                    <div class="alert alert-light border d-flex flex-wrap gap-3 small mb-4">
+                        <span><strong>Tahun:</strong> {{ $filters['tahun'] }}</span>
+                        <span><strong>Periode:</strong> {{ $filters['periode_label'] }}</span>
+                        <span><strong>Tanggal laporan:</strong> {{ $reportGeneratedAt->translatedFormat('d F Y') }}</span>
+                    </div>
                     <!-- Quick KPI Pill Header -->
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-sm-6 col-lg-3">
@@ -291,6 +296,11 @@
                 <!-- TAB 2: REKAPITULASI KOMODITAS IKAN                    -->
                 <!-- ===================================================== -->
                 <div class="tab-pane fade {{ $activeTab === 'ikan' ? 'show active' : '' }}" id="tab-ikan" role="tabpanel" aria-labelledby="tab-ikan-btn">
+                    <div class="alert alert-light border d-flex flex-wrap gap-3 small mb-4">
+                        <span><strong>Tahun:</strong> {{ $filters['tahun'] }}</span>
+                        <span><strong>Periode:</strong> {{ $filters['periode_label'] }}</span>
+                        <span><strong>Tanggal laporan:</strong> {{ $reportGeneratedAt->translatedFormat('d F Y') }}</span>
+                    </div>
                     <!-- Quick KPI Pill Header -->
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-sm-6 col-lg-3">
@@ -581,7 +591,7 @@ function switchReportTab(tabName) {
     document.getElementById('activeTabInput').value = tabName;
 
     // Update export and print button URLs with active tab
-    const exportBtn = document.getElementById('btnExportCsv');
+    const exportBtn = document.getElementById('btnExportExcel');
     const printBtn = document.getElementById('btnCetakDoc');
 
     if (exportBtn) {

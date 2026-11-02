@@ -19,14 +19,14 @@
                 <i class="bi bi-journal-text text-primary"></i> Data Pendaratan & Produksi Ikan
             </h4>
         </div>
-        @if(auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin())
+        @can('create', \App\Models\Pendaratan::class)
         <div>
             <a href="{{ route('pendaratan.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-plus-circle-fill"></i>
                 <span class="fw-semibold">Catat Pendaratan Ikan</span>
             </a>
         </div>
-        @endif
+        @endcan
     </div>
 
     <!-- Summary Stat Cards -->
@@ -266,32 +266,39 @@
                                 </a>
 
                                 <!-- Quick Ajukan (if draft or ditolak) -->
-                                @if(in_array($item->status_verifikasi, ['draft', 'ditolak']) && (auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin()))
+                                @if(in_array($item->status_verifikasi, ['draft', 'ditolak']))
+                                @can('submit', $item)
                                 <form action="{{ route('pendaratan.ajukan', $item) }}" method="POST" class="d-inline" onsubmit="return confirm('Ajukan data {{ $item->kode_pendaratan }} ke petugas verifikator?');">
                                     @csrf
                                     <button type="submit" class="btn btn-outline-primary" title="Ajukan Verifikasi">
                                         <i class="bi bi-send"></i>
                                     </button>
                                 </form>
+                                @endcan
                                 @endif
 
                                 <!-- Edit Button (only draft or ditolak) -->
-                                @if(in_array($item->status_verifikasi, ['draft', 'ditolak']) && (auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin()))
+                                @if(in_array($item->status_verifikasi, ['draft', 'ditolak']))
+                                @can('update', $item)
                                 <a href="{{ route('pendaratan.edit', $item) }}" class="btn btn-outline-warning" title="Ubah Data">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                @endcan
                                 @endif
 
                                 <!-- Delete Button (only draft) -->
-                                @if($item->status_verifikasi === 'draft' && (auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin()))
+                                @if($item->status_verifikasi === 'draft')
+                                @can('delete', $item)
                                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $item->id }}" title="Hapus Data">
                                     <i class="bi bi-trash"></i>
                                 </button>
+                                @endcan
                                 @endif
                             </div>
 
                             <!-- Delete Modal for Draft -->
                             @if($item->status_verifikasi === 'draft')
+                            @can('delete', $item)
                             <div class="modal fade" id="deleteModal{{ $item->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content">
@@ -320,6 +327,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @endcan
                             @endif
                         </td>
                     </tr>
@@ -331,11 +339,11 @@
                             </div>
                             <h6 class="fw-bold text-dark">Belum Ada Data Pendaratan</h6>
                             <p class="text-muted small mb-3">Tidak ada data pendaratan yang sesuai dengan kriteria filter Anda.</p>
-                            @if(auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin())
+                            @can('create', \App\Models\Pendaratan::class)
                             <a href="{{ route('pendaratan.create') }}" class="btn btn-sm btn-primary">
                                 <i class="bi bi-plus-circle me-1"></i> Catat Pendaratan Pertama
                             </a>
-                            @endif
+                            @endcan
                         </td>
                     </tr>
                     @endforelse

@@ -19,12 +19,14 @@
                 <i class="bi bi-building text-primary"></i> Data Tempat Pelelangan Ikan (TPI)
             </h4>
         </div>
+        @can('create', \App\Models\Tpi::class)
         <div>
             <a href="{{ route('tpi.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-plus-lg"></i>
                 <span class="fw-semibold">Tambah TPI Baru</span>
             </a>
         </div>
+        @endcan
     </div>
 
     <!-- Filter & Search Card -->
@@ -90,7 +92,9 @@
                         <th>Instansi Pengelola</th>
                         <th class="text-center" style="width: 140px;">Status</th>
                         <th class="text-center" style="width: 130px;">Statistik</th>
+                        @can('create', \App\Models\Tpi::class)
                         <th class="text-center" style="width: 150px;">Aksi</th>
+                        @endcan
                     </tr>
                 </thead>
                 <tbody>
@@ -143,11 +147,15 @@
                                     </span>
                                 </div>
                             </td>
+                            @can('create', \App\Models\Tpi::class)
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
+                                    @can('update', $tpi)
                                     <a href="{{ route('tpi.edit', $tpi) }}" class="btn btn-sm btn-outline-warning text-dark" title="Edit Data">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
+                                    @endcan
+                                    @can('delete', $tpi)
                                     <form action="{{ route('tpi.destroy', $tpi) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus TPI \'{{ $tpi->nama_tpi }}\'? Tindakan ini tidak dapat dibatalkan.');">
                                         @csrf
                                         @method('DELETE')
@@ -155,16 +163,24 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
+                            @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="{{ auth()->user()?->can('create', \App\Models\Tpi::class) ? 8 : 7 }}" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="bi bi-building-slash display-6 d-block mb-2"></i>
                                     <span class="fw-semibold">Tidak ada data TPI ditemukan.</span>
-                                    <p class="small text-secondary mb-0">Coba ubah kata kunci pencarian atau tambahkan data TPI baru.</p>
+                                    <p class="small text-secondary mb-0">
+                                        @can('create', \App\Models\Tpi::class)
+                                            Coba ubah kata kunci pencarian atau tambahkan data TPI baru.
+                                        @else
+                                            Coba ubah kata kunci pencarian atau filter yang digunakan.
+                                        @endcan
+                                    </p>
                                 </div>
                             </td>
                         </tr>

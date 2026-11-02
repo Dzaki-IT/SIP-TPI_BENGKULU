@@ -17,14 +17,16 @@ class TpiController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Tpi::class);
+
         $query = Tpi::with('wilayah')->withCount(['nelayan', 'pendaratan']);
 
         if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('nama_tpi', 'like', "%{$search}%")
-                  ->orWhere('kode_tpi', 'like', "%{$search}%")
-                  ->orWhere('instansi_pengelola', 'like', "%{$search}%");
+                    ->orWhere('kode_tpi', 'like', "%{$search}%")
+                    ->orWhere('instansi_pengelola', 'like', "%{$search}%");
             });
         }
 
@@ -47,6 +49,8 @@ class TpiController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', Tpi::class);
+
         $wilayahList = Wilayah::orderBy('nama_kabupaten_kota')->get();
 
         return view('master.tpi.create', compact('wilayahList'));
@@ -57,6 +61,8 @@ class TpiController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Tpi::class);
+
         $validated = $request->validate([
             'kode_tpi' => ['required', 'string', 'max:20', 'unique:tpi,kode_tpi'],
             'nama_tpi' => ['required', 'string', 'max:100'],
@@ -85,7 +91,9 @@ class TpiController extends Controller
      */
     public function show(Tpi $tpi): RedirectResponse
     {
-        return redirect()->route('tpi.edit', $tpi);
+        $this->authorize('view', $tpi);
+
+        return redirect()->route('tpi.index');
     }
 
     /**
@@ -93,6 +101,8 @@ class TpiController extends Controller
      */
     public function edit(Tpi $tpi): View
     {
+        $this->authorize('update', $tpi);
+
         $wilayahList = Wilayah::orderBy('nama_kabupaten_kota')->get();
 
         return view('master.tpi.edit', compact('tpi', 'wilayahList'));
@@ -103,6 +113,8 @@ class TpiController extends Controller
      */
     public function update(Request $request, Tpi $tpi): RedirectResponse
     {
+        $this->authorize('update', $tpi);
+
         $validated = $request->validate([
             'kode_tpi' => ['required', 'string', 'max:20', Rule::unique('tpi', 'kode_tpi')->ignore($tpi->id)],
             'nama_tpi' => ['required', 'string', 'max:100'],
@@ -131,6 +143,8 @@ class TpiController extends Controller
      */
     public function destroy(Tpi $tpi): RedirectResponse
     {
+        $this->authorize('delete', $tpi);
+
         if ($tpi->pendaratan()->exists()) {
             return redirect()->route('tpi.index')->with('error', "TPI '{$tpi->nama_tpi}' tidak dapat dihapus karena memiliki riwayat pendaratan aktif.");
         }

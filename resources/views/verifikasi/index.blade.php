@@ -168,9 +168,15 @@
                         </td>
                         <td class="text-center pe-3 text-nowrap">
                             @if($item->status_verifikasi === 'diajukan')
+                                @can('verify', $item)
                                 <a href="{{ route('verifikasi.show', $item) }}" class="btn btn-sm btn-primary shadow-sm px-3">
                                     <i class="bi bi-shield-check me-1"></i> Tinjau & Verifikasi
                                 </a>
+                                @else
+                                <a href="{{ route('verifikasi.show', $item) }}" class="btn btn-sm btn-outline-secondary px-3">
+                                    <i class="bi bi-eye me-1"></i> Detail
+                                </a>
+                                @endcan
                             @else
                                 <a href="{{ route('verifikasi.show', $item) }}" class="btn btn-sm btn-outline-secondary px-3">
                                     <i class="bi bi-eye me-1"></i> Detail

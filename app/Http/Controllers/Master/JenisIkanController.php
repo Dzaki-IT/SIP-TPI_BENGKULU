@@ -27,14 +27,16 @@ class JenisIkanController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', JenisIkan::class);
+
         $query = JenisIkan::withCount('detailPendaratan');
 
         if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('nama_resmi', 'like', "%{$search}%")
-                  ->orWhere('nama_lokal', 'like', "%{$search}%")
-                  ->orWhere('kode_ikan', 'like', "%{$search}%");
+                    ->orWhere('nama_lokal', 'like', "%{$search}%")
+                    ->orWhere('kode_ikan', 'like', "%{$search}%");
             });
         }
 
@@ -57,6 +59,8 @@ class JenisIkanController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', JenisIkan::class);
+
         $categories = $this->categories;
 
         return view('master.jenis-ikan.create', compact('categories'));
@@ -67,6 +71,8 @@ class JenisIkanController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', JenisIkan::class);
+
         $validated = $request->validate([
             'kode_ikan' => ['required', 'string', 'max:20', 'unique:jenis_ikan,kode_ikan'],
             'nama_resmi' => ['required', 'string', 'max:100'],
@@ -94,7 +100,9 @@ class JenisIkanController extends Controller
      */
     public function show(JenisIkan $jenisIkan): RedirectResponse
     {
-        return redirect()->route('jenis-ikan.edit', $jenisIkan);
+        $this->authorize('view', $jenisIkan);
+
+        return redirect()->route('jenis-ikan.index');
     }
 
     /**
@@ -102,6 +110,8 @@ class JenisIkanController extends Controller
      */
     public function edit(JenisIkan $jenisIkan): View
     {
+        $this->authorize('update', $jenisIkan);
+
         $categories = $this->categories;
 
         return view('master.jenis-ikan.edit', compact('jenisIkan', 'categories'));
@@ -112,6 +122,8 @@ class JenisIkanController extends Controller
      */
     public function update(Request $request, JenisIkan $jenisIkan): RedirectResponse
     {
+        $this->authorize('update', $jenisIkan);
+
         $validated = $request->validate([
             'kode_ikan' => ['required', 'string', 'max:20', Rule::unique('jenis_ikan', 'kode_ikan')->ignore($jenisIkan->id)],
             'nama_resmi' => ['required', 'string', 'max:100'],
@@ -139,6 +151,8 @@ class JenisIkanController extends Controller
      */
     public function destroy(JenisIkan $jenisIkan): RedirectResponse
     {
+        $this->authorize('delete', $jenisIkan);
+
         if ($jenisIkan->detailPendaratan()->exists()) {
             return redirect()->route('jenis-ikan.index')->with('error', "Jenis ikan '{$jenisIkan->nama_resmi}' tidak dapat dihapus karena memiliki riwayat pencatatan pendaratan.");
         }

@@ -19,12 +19,14 @@
                 <i class="bi bi-tsunami text-primary"></i> Data Armada Kapal & Perahu
             </h4>
         </div>
+        @can('create', \App\Models\Kapal::class)
         <div>
             <a href="{{ route('kapal.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-plus-lg"></i>
                 <span class="fw-semibold">Tambah Kapal Baru</span>
             </a>
         </div>
+        @endcan
     </div>
 
     <!-- Filter & Search Card -->
@@ -92,7 +94,9 @@
                         <th>Pemilik / Nakhoda</th>
                         <th>No. SIPI</th>
                         <th class="text-center" style="width: 110px;">Status</th>
+                        @can('create', \App\Models\Kapal::class)
                         <th class="text-center" style="width: 140px;">Aksi</th>
+                        @endcan
                     </tr>
                 </thead>
                 <tbody>
@@ -164,11 +168,15 @@
                                     </span>
                                 @endif
                             </td>
+                            @can('create', \App\Models\Kapal::class)
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
+                                    @can('update', $kapal)
                                     <a href="{{ route('kapal.edit', $kapal) }}" class="btn btn-sm btn-outline-warning text-dark" title="Edit Data">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
+                                    @endcan
+                                    @can('delete', $kapal)
                                     <form action="{{ route('kapal.destroy', $kapal) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus kapal \'{{ $kapal->nama_kapal }}\'? Data yang memiliki riwayat pendaratan tidak dapat dihapus.');">
                                         @csrf
                                         @method('DELETE')
@@ -176,12 +184,14 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
+                            @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-5">
+                            <td colspan="{{ auth()->user()?->can('create', \App\Models\Kapal::class) ? 9 : 8 }}" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="bi bi-tsunami display-6 d-block mb-2"></i>
                                     <span class="fw-semibold">Tidak ada data kapal ditemukan.</span>

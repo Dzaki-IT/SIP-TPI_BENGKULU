@@ -19,12 +19,14 @@
                 <i class="bi bi-fingerprint text-primary"></i> Master Komoditas Ikan & Hasil Laut
             </h4>
         </div>
+        @can('create', \App\Models\JenisIkan::class)
         <div>
             <a href="{{ route('jenis-ikan.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-plus-lg"></i>
                 <span class="fw-semibold">Tambah Jenis Ikan</span>
             </a>
         </div>
+        @endcan
     </div>
 
     <!-- Filter & Search Card -->
@@ -94,7 +96,9 @@
                         <th class="text-center" style="width: 100px;">Satuan</th>
                         <th class="text-center" style="width: 140px;">Pencatatan</th>
                         <th class="text-center" style="width: 110px;">Status</th>
+                        @can('create', \App\Models\JenisIkan::class)
                         <th class="text-center" style="width: 140px;">Aksi</th>
+                        @endcan
                     </tr>
                 </thead>
                 <tbody>
@@ -162,11 +166,15 @@
                                     </span>
                                 @endif
                             </td>
+                            @can('create', \App\Models\JenisIkan::class)
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
+                                    @can('update', $ikan)
                                     <a href="{{ route('jenis-ikan.edit', $ikan) }}" class="btn btn-sm btn-outline-warning text-dark" title="Edit Data">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
+                                    @endcan
+                                    @can('delete', $ikan)
                                     <form action="{{ route('jenis-ikan.destroy', $ikan) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus komoditas ikan \'{{ $ikan->nama_resmi }}\'? Data yang memiliki riwayat pencatatan pendaratan tidak dapat dihapus.');">
                                         @csrf
                                         @method('DELETE')
@@ -174,12 +182,14 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
+                            @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-5">
+                            <td colspan="{{ auth()->user()?->can('create', \App\Models\JenisIkan::class) ? 9 : 8 }}" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="bi bi-fingerprint display-6 d-block mb-2"></i>
                                     <span class="fw-semibold">Tidak ada komoditas ikan ditemukan.</span>

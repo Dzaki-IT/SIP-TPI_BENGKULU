@@ -6,7 +6,7 @@ use App\Models\Pendaratan;
 use App\Models\Tpi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class VerifikasiController extends Controller
@@ -16,6 +16,8 @@ class VerifikasiController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewVerification', Pendaratan::class);
+
         $query = Pendaratan::with([
             'tpi',
             'kapal',
@@ -50,12 +52,12 @@ class VerifikasiController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('kode_pendaratan', 'like', "%{$search}%")
-                  ->orWhereHas('kapal', function ($kq) use ($search) {
-                      $kq->where('nama_kapal', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('nelayan', function ($nq) use ($search) {
-                      $nq->where('nama', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('kapal', function ($kq) use ($search) {
+                        $kq->where('nama_kapal', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('nelayan', function ($nq) use ($search) {
+                        $nq->where('nama', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -88,6 +90,8 @@ class VerifikasiController extends Controller
      */
     public function show(Pendaratan $pendaratan): View
     {
+        $this->authorize('viewVerification', Pendaratan::class);
+
         $pendaratan->load([
             'tpi.wilayah',
             'kapal',
@@ -106,10 +110,7 @@ class VerifikasiController extends Controller
      */
     public function approve(Request $request, Pendaratan $pendaratan): RedirectResponse
     {
-        // Strictly verify user role
-        if (!Auth::user()?->isVerifikator()) {
-            abort(403, 'Akses ditolak. Hanya petugas berwenang (Verifikator) yang berhak menyetujui data pendaratan.');
-        }
+        $this->authorize('verify', $pendaratan);
 
         // Only records with status 'diajukan' can be approved
         if ($pendaratan->status_verifikasi !== 'diajukan') {
@@ -117,12 +118,24 @@ class VerifikasiController extends Controller
                 ->with('error', 'Hanya data pendaratan yang berstatus diajukan yang dapat disetujui & diverifikasi.');
         }
 
-        $pendaratan->update([
-            'status_verifikasi' => 'diverifikasi',
-            'verified_by' => Auth::id(),
-            'verified_at' => now(),
-            'catatan_verifikasi' => $request->input('catatan', null),
-        ]);
+        DB::transaction(function () use ($pendaratan, $request): void {
+            $catatan = $request->input('catatan');
+
+            $pendaratan->update([
+                'status_verifikasi' => 'diverifikasi',
+                'verified_by' => $request->user()->id,
+                'verified_at' => now(),
+                'catatan_verifikasi' => $catatan,
+            ]);
+
+            $pendaratan->verificationHistories()->create([
+                'actor_id' => $request->user()->id,
+                'action' => 'disetujui',
+                'from_status' => 'diajukan',
+                'to_status' => 'diverifikasi',
+                'catatan' => $catatan,
+            ]);
+        });
 
         return redirect()->route('verifikasi.index')
             ->with('success', "Data pendaratan {$pendaratan->kode_pendaratan} berhasil disetujui & diverifikasi.");
@@ -133,10 +146,7 @@ class VerifikasiController extends Controller
      */
     public function reject(Request $request, Pendaratan $pendaratan): RedirectResponse
     {
-        // Strictly verify user role
-        if (!Auth::user()?->isVerifikator()) {
-            abort(403, 'Akses ditolak. Hanya petugas berwenang (Verifikator) yang berhak menolak data pendaratan.');
-        }
+        $this->authorize('verify', $pendaratan);
 
         // Only records with status 'diajukan' can be rejected
         if ($pendaratan->status_verifikasi !== 'diajukan') {
@@ -151,12 +161,22 @@ class VerifikasiController extends Controller
             'catatan_verifikasi.min' => 'Catatan alasan penolakan minimal 5 karakter.',
         ]);
 
-        $pendaratan->update([
-            'status_verifikasi' => 'ditolak',
-            'verified_by' => Auth::id(),
-            'verified_at' => now(),
-            'catatan_verifikasi' => $validated['catatan_verifikasi'],
-        ]);
+        DB::transaction(function () use ($pendaratan, $request, $validated): void {
+            $pendaratan->update([
+                'status_verifikasi' => 'ditolak',
+                'verified_by' => $request->user()->id,
+                'verified_at' => now(),
+                'catatan_verifikasi' => $validated['catatan_verifikasi'],
+            ]);
+
+            $pendaratan->verificationHistories()->create([
+                'actor_id' => $request->user()->id,
+                'action' => 'ditolak',
+                'from_status' => 'diajukan',
+                'to_status' => 'ditolak',
+                'catatan' => $validated['catatan_verifikasi'],
+            ]);
+        });
 
         return redirect()->route('verifikasi.index')
             ->with('warning', "Data pendaratan {$pendaratan->kode_pendaratan} ditolak dengan catatan perbaikan.");

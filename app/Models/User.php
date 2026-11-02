@@ -6,11 +6,11 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 #[Fillable(['name', 'email', 'password', 'role', 'tpi_id', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
@@ -71,6 +71,58 @@ class User extends Authenticatable
     public function isPimpinan(): bool
     {
         return $this->role === 'pimpinan';
+    }
+
+    /**
+     * Determine whether the user may view operational and master data.
+     */
+    public function canViewOperationalData(): bool
+    {
+        return in_array($this->role, ['admin', 'admin_tpi', 'verifikator', 'pimpinan'], true);
+    }
+
+    /**
+     * Determine whether the user may manage central reference data.
+     */
+    public function canManageReferenceData(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    /**
+     * Determine whether the user may manage data assigned to a TPI.
+     */
+    public function canManageAssignedTpiData(): bool
+    {
+        if ($this->role === 'admin') {
+            return true;
+        }
+
+        return $this->isAdminTpi() && $this->tpi_id !== null;
+    }
+
+    /**
+     * Determine whether the user may manage data for a specific TPI.
+     */
+    public function canManageTpiData(int $tpiId): bool
+    {
+        return $this->role === 'admin' || ($this->isAdminTpi() && $this->tpi_id === $tpiId);
+    }
+
+    /**
+     * Determine whether the user may access the verification workspace.
+     */
+    public function canViewVerification(): bool
+    {
+        return $this->isVerifikator();
+    }
+
+    /**
+     * Determine whether the user may decide a landing verification.
+     */
+    public function canVerifyPendaratan(): bool
+    {
+        return $this->isVerifikator();
     }
 
     /**

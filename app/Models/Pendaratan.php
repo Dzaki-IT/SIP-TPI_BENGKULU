@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Pendaratan extends Model
 {
@@ -35,17 +36,42 @@ class Pendaratan extends Model
         'status_verifikasi' => 'string',
     ];
 
-    protected static function boot()
+    protected static function booted(): void
     {
-        parent::boot();
-
-        static::creating(function ($model) {
-            if (empty($model->kode_pendaratan)) {
-                $date = now()->format('Ymd');
-                $latest = static::where('kode_pendaratan', 'like', "PDR-{$date}-%")->orderBy('id', 'desc')->first();
-                $sequence = $latest ? ((int) substr($latest->kode_pendaratan, -4)) + 1 : 1;
-                $model->kode_pendaratan = "PDR-{$date}-" . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+        static::creating(function (self $pendaratan): void {
+            if (blank($pendaratan->kode_pendaratan)) {
+                $pendaratan->kode_pendaratan = self::nextKodePendaratan($pendaratan->tanggal_pendaratan);
             }
+        });
+    }
+
+    private static function nextKodePendaratan(string|Carbon|null $tanggalPendaratan): string
+    {
+        $tanggal = Carbon::parse($tanggalPendaratan ?? now())->toDateString();
+        $tanggalKode = Carbon::parse($tanggal)->format('Ymd');
+
+        return DB::transaction(function () use ($tanggal, $tanggalKode): string {
+            DB::table('landing_number_sequences')->insertOrIgnore([
+                'sequence_date' => $tanggal,
+                'last_number' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $lastNumber = (int) DB::table('landing_number_sequences')
+                ->where('sequence_date', $tanggal)
+                ->lockForUpdate()
+                ->value('last_number');
+            $nextNumber = $lastNumber + 1;
+
+            DB::table('landing_number_sequences')
+                ->where('sequence_date', $tanggal)
+                ->update([
+                    'last_number' => $nextNumber,
+                    'updated_at' => now(),
+                ]);
+
+            return sprintf('PDR-%s-%04d', $tanggalKode, $nextNumber);
         });
     }
 
@@ -72,6 +98,11 @@ class Pendaratan extends Model
     public function detailPendaratan(): HasMany
     {
         return $this->hasMany(DetailPendaratan::class);
+    }
+
+    public function verificationHistories(): HasMany
+    {
+        return $this->hasMany(VerificationHistory::class)->latest('id');
     }
 
     public function creator(): BelongsTo

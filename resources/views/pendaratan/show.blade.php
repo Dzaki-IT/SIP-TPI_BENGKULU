@@ -61,32 +61,38 @@
             </button>
 
             <!-- Actions for Draft or Ditolak -->
-            @if(in_array($pendaratan->status_verifikasi, ['draft', 'ditolak']) && (auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin()))
+            @if(in_array($pendaratan->status_verifikasi, ['draft', 'ditolak']))
+                @can('update', $pendaratan)
                 <a href="{{ route('pendaratan.edit', $pendaratan) }}" class="btn btn-outline-warning">
                     <i class="bi bi-pencil me-1"></i> Ubah Data
                 </a>
+                @endcan
 
+                @can('submit', $pendaratan)
                 <form action="{{ route('pendaratan.ajukan', $pendaratan) }}" method="POST" class="d-inline" onsubmit="return confirm('Ajukan dokumen pendaratan ini ke verifikator dinas?');">
                     @csrf
                     <button type="submit" class="btn btn-primary shadow-sm">
                         <i class="bi bi-send-check me-1"></i> Ajukan Verifikasi
                     </button>
                 </form>
+                @endcan
             @endif
 
             <!-- Delete for Draft only -->
-            @if($pendaratan->status_verifikasi === 'draft' && (auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin()))
+            @if($pendaratan->status_verifikasi === 'draft')
+                @can('delete', $pendaratan)
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                     <i class="bi bi-trash me-1"></i> Hapus
                 </button>
+                @endcan
             @endif
 
             <!-- Quick link for Verifikator if Diajukan -->
-            @if($pendaratan->status_verifikasi === 'diajukan' && auth()->user()?->isVerifikator())
+            @can('verify', $pendaratan)
                 <a href="{{ route('verifikasi.show', $pendaratan) }}" class="btn btn-success shadow-sm">
                     <i class="bi bi-shield-check me-1"></i> Verifikasi Sekarang
                 </a>
-            @endif
+            @endcan
         </div>
     </div>
 
@@ -105,13 +111,13 @@
                     <span><i class="bi bi-clock me-1"></i> Waktu: {{ $pendaratan->verified_at->translatedFormat('d F Y, H:i') }} WIB</span>
                 @endif
             </div>
-            @if(auth()->user()?->role === 'admin_tpi' || auth()->user()?->isAdmin())
+            @can('update', $pendaratan)
             <div class="mt-3">
                 <a href="{{ route('pendaratan.edit', $pendaratan) }}" class="btn btn-sm btn-danger">
                     <i class="bi bi-pencil-square me-1"></i> Klik di Sini untuk Memperbaiki Data
                 </a>
             </div>
-            @endif
+            @endcan
         </div>
     </div>
     @endif
@@ -319,6 +325,42 @@
             </div>
         </div>
 
+        <div class="mb-4">
+            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+                <i class="bi bi-clock-history text-primary"></i> Riwayat Pengajuan dan Verifikasi
+            </h6>
+            <div class="table-responsive border rounded">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Aktivitas</th>
+                            <th>Petugas</th>
+                            <th>Perubahan Status</th>
+                            <th>Catatan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($pendaratan->verificationHistories as $history)
+                            <tr>
+                                <td class="text-nowrap small">{{ $history->created_at->translatedFormat('d M Y, H:i') }} WIB</td>
+                                <td class="fw-semibold text-capitalize">{{ $history->action }}</td>
+                                <td>{{ $history->actor->name ?? 'Sistem / akun yang sudah tidak aktif' }}</td>
+                                <td>
+                                    <span class="text-muted">{{ $history->from_status ?? '—' }}</span>
+                                    <i class="bi bi-arrow-right mx-1"></i>
+                                    <span class="fw-semibold">{{ $history->to_status }}</span>
+                                </td>
+                                <td class="small">{{ $history->catatan ?: '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="text-center text-muted py-3">Belum ada aktivitas pengajuan atau verifikasi.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Signatures & Verification Footer (Print Friendly) -->
         <div class="row text-center mt-5 pt-4">
             <div class="col-4">
@@ -352,6 +394,7 @@
 
 <!-- Delete Confirmation Modal (Draft Only) -->
 @if($pendaratan->status_verifikasi === 'draft')
+@can('delete', $pendaratan)
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -378,6 +421,7 @@
         </div>
     </div>
 </div>
+@endcan
 @endif
 
 @endsection

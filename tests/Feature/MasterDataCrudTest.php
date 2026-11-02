@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\AlatTangkap;
+use App\Models\DetailPendaratan;
 use App\Models\JenisIkan;
 use App\Models\Kapal;
 use App\Models\Nelayan;
+use App\Models\Pendaratan;
 use App\Models\Tpi;
 use App\Models\User;
 use App\Models\Wilayah;
@@ -17,7 +19,12 @@ class MasterDataCrudTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
+    protected User $pimpinan;
+
     protected Wilayah $wilayah;
+
+    protected Tpi $assignedTpi;
 
     protected function setUp(): void
     {
@@ -28,12 +35,32 @@ class MasterDataCrudTest extends TestCase
             ['nama_kabupaten_kota' => 'Kota Bengkulu']
         );
 
+        $this->assignedTpi = Tpi::firstOrCreate(
+            ['kode_tpi' => 'TPI-ASSIGNED'],
+            [
+                'nama_tpi' => 'TPI Penugasan Admin',
+                'wilayah_id' => $this->wilayah->id,
+                'status_operasi' => 'aktif',
+            ]
+        );
+
         $this->user = User::firstOrCreate(
             ['email' => 'admin_test@tpi-bengkulu.test'],
             [
                 'name' => 'Admin Tester',
                 'password' => bcrypt('password'),
                 'role' => 'admin_tpi',
+                'tpi_id' => $this->assignedTpi->id,
+                'is_active' => true,
+            ]
+        );
+
+        $this->pimpinan = User::firstOrCreate(
+            ['email' => 'pimpinan_test@tpi-bengkulu.test'],
+            [
+                'name' => 'Pimpinan Tester',
+                'password' => bcrypt('password'),
+                'role' => 'pimpinan',
                 'is_active' => true,
             ]
         );
@@ -61,7 +88,7 @@ class MasterDataCrudTest extends TestCase
 
     public function test_tpi_crud_lifecycle(): void
     {
-        $this->actingAs($this->user);
+        $this->actingAs($this->pimpinan);
 
         // Create
         $response = $this->post(route('tpi.store'), [
@@ -111,6 +138,7 @@ class MasterDataCrudTest extends TestCase
             ['kode_tpi' => 'TPI-DUMMY'],
             ['nama_tpi' => 'TPI Dummy', 'wilayah_id' => $this->wilayah->id, 'status_operasi' => 'aktif']
         );
+        $this->user->update(['tpi_id' => $tpi->id]);
 
         // Create
         $response = $this->post(route('nelayan.store'), [
@@ -154,10 +182,18 @@ class MasterDataCrudTest extends TestCase
     {
         $this->actingAs($this->user);
 
+        $nelayan = Nelayan::create([
+            'kode_nelayan' => 'NL-KAPAL',
+            'nama' => 'Pemilik Kapal Pengujian',
+            'tpi_id' => $this->assignedTpi->id,
+            'is_active' => true,
+        ]);
+
         // Create
         $response = $this->post(route('kapal.store'), [
             'kode_kapal' => 'KPL-TEST',
             'nama_kapal' => 'KM Sumber Rezeki',
+            'nelayan_id' => $nelayan->id,
             'jenis_kapal' => 'motor_tempel',
             'gt' => 3.5,
             'no_sipi' => 'SIPI-BKL-TEST',
@@ -177,6 +213,7 @@ class MasterDataCrudTest extends TestCase
         $this->put(route('kapal.update', $kapal), [
             'kode_kapal' => 'KPL-TEST',
             'nama_kapal' => 'KM Sumber Rezeki Abadi',
+            'nelayan_id' => $nelayan->id,
             'jenis_kapal' => 'kapal_motor',
             'gt' => 5.0,
             'is_active' => '1',
@@ -195,11 +232,19 @@ class MasterDataCrudTest extends TestCase
     {
         $this->actingAs($this->user);
 
+        $nelayan = Nelayan::create([
+            'kode_nelayan' => 'NL-ALAT',
+            'nama' => 'Pemilik Alat Tangkap',
+            'tpi_id' => $this->assignedTpi->id,
+            'is_active' => true,
+        ]);
+
         // Create
         $response = $this->post(route('alat-tangkap.store'), [
             'kode_alat' => 'AT-TEST',
             'nama_alat' => 'Jaring Insang Percobaan',
             'jenis_kategori' => 'Jaring',
+            'nelayan_id' => $nelayan->id,
             'is_active' => '1',
         ]);
 
@@ -208,15 +253,24 @@ class MasterDataCrudTest extends TestCase
 
         $alat = AlatTangkap::where('kode_alat', 'AT-TEST')->first();
         $this->assertNotNull($alat);
+        $this->assertSame($nelayan->id, $alat->fresh()->nelayan_id);
 
         // Edit
-        $this->get(route('alat-tangkap.edit', $alat))->assertOk()->assertSee('Jaring Insang Percobaan');
+        $this->get(route('alat-tangkap.edit', $alat))
+            ->assertOk()
+            ->assertSee('Jaring Insang Percobaan')
+            ->assertSee('Pemilik Alat Tangkap');
+
+        $this->get(route('nelayan.index'))
+            ->assertOk()
+            ->assertSee('1 Alat Tangkap');
 
         // Update
         $this->put(route('alat-tangkap.update', $alat), [
             'kode_alat' => 'AT-TEST',
             'nama_alat' => 'Jaring Insang Modern',
             'jenis_kategori' => 'Jaring',
+            'nelayan_id' => $nelayan->id,
             'is_active' => '1',
         ])->assertRedirect(route('alat-tangkap.index'));
 
@@ -231,7 +285,7 @@ class MasterDataCrudTest extends TestCase
 
     public function test_jenis_ikan_crud_lifecycle(): void
     {
-        $this->actingAs($this->user);
+        $this->actingAs($this->pimpinan);
 
         // Create
         $response = $this->post(route('jenis-ikan.store'), [
@@ -282,6 +336,7 @@ class MasterDataCrudTest extends TestCase
             'jenis_perairan' => 'laut',
             'status_operasi' => 'aktif',
         ]);
+        $this->user->update(['tpi_id' => $tpi->id]);
 
         $nelayan = Nelayan::create([
             'kode_nelayan' => 'NL-REL',
@@ -301,6 +356,7 @@ class MasterDataCrudTest extends TestCase
         $alat = AlatTangkap::create([
             'kode_alat' => 'AT-REL',
             'nama_alat' => 'Alat Relasional',
+            'nelayan_id' => $nelayan->id,
             'is_active' => true,
         ]);
 
@@ -313,10 +369,13 @@ class MasterDataCrudTest extends TestCase
         ]);
 
         // TPI cannot be deleted because it has nelayan
-        $this->delete(route('tpi.destroy', $tpi))
+        $this->actingAs($this->pimpinan)
+            ->delete(route('tpi.destroy', $tpi))
             ->assertRedirect(route('tpi.index'))
             ->assertSessionHas('error');
         $this->assertDatabaseHas('tpi', ['id' => $tpi->id]);
+
+        $this->actingAs($this->user);
 
         // Nelayan cannot be deleted because it has kapal
         $this->delete(route('nelayan.destroy', $nelayan))
@@ -325,7 +384,7 @@ class MasterDataCrudTest extends TestCase
         $this->assertDatabaseHas('nelayan', ['id' => $nelayan->id]);
 
         // Create Pendaratan transaction
-        $pendaratan = \App\Models\Pendaratan::create([
+        $pendaratan = Pendaratan::create([
             'tpi_id' => $tpi->id,
             'kapal_id' => $kapal->id,
             'nelayan_id' => $nelayan->id,
@@ -335,7 +394,7 @@ class MasterDataCrudTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        \App\Models\DetailPendaratan::create([
+        DetailPendaratan::create([
             'pendaratan_id' => $pendaratan->id,
             'jenis_ikan_id' => $ikan->id,
             'volume_kg' => 100,
@@ -355,9 +414,35 @@ class MasterDataCrudTest extends TestCase
         $this->assertDatabaseHas('alat_tangkap', ['id' => $alat->id]);
 
         // Jenis ikan cannot be deleted because it has detail_pendaratan
+        $this->actingAs($this->pimpinan);
         $this->delete(route('jenis-ikan.destroy', $ikan))
             ->assertRedirect(route('jenis-ikan.index'))
             ->assertSessionHas('error');
         $this->assertDatabaseHas('jenis_ikan', ['id' => $ikan->id]);
+    }
+
+    public function test_nelayan_cannot_be_deleted_when_it_owns_alat_tangkap(): void
+    {
+        $this->actingAs($this->user);
+
+        $nelayan = Nelayan::create([
+            'kode_nelayan' => 'NL-ALAT-DEL',
+            'nama' => 'Pemilik Alat Untuk Uji Hapus',
+            'tpi_id' => $this->assignedTpi->id,
+            'is_active' => true,
+        ]);
+
+        AlatTangkap::create([
+            'kode_alat' => 'AT-DEL',
+            'nama_alat' => 'Alat Milik Nelayan',
+            'nelayan_id' => $nelayan->id,
+            'is_active' => true,
+        ]);
+
+        $this->delete(route('nelayan.destroy', $nelayan))
+            ->assertRedirect(route('nelayan.index'))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('nelayan', ['id' => $nelayan->id]);
     }
 }

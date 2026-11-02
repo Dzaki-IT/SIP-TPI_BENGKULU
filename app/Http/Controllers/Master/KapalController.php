@@ -17,17 +17,24 @@ class KapalController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Kapal::class);
+
+        $user = $request->user();
         $query = Kapal::with('nelayan.tpi')->withCount('pendaratan');
+
+        if ($user?->isAdminTpi()) {
+            $query->whereHas('nelayan', fn ($nelayanQuery) => $nelayanQuery->where('tpi_id', $user->tpi_id ?? 0));
+        }
 
         if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 $q->where('nama_kapal', 'like', "%{$search}%")
-                  ->orWhere('kode_kapal', 'like', "%{$search}%")
-                  ->orWhere('no_sipi', 'like', "%{$search}%")
-                  ->orWhereHas('nelayan', function ($nq) use ($search) {
-                      $nq->where('nama', 'like', "%{$search}%");
-                  });
+                    ->orWhere('kode_kapal', 'like', "%{$search}%")
+                    ->orWhere('no_sipi', 'like', "%{$search}%")
+                    ->orWhereHas('nelayan', function ($nq) use ($search) {
+                        $nq->where('nama', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -49,7 +56,13 @@ class KapalController extends Controller
      */
     public function create(): View
     {
-        $nelayanList = Nelayan::aktif()->orderBy('nama')->get();
+        $this->authorize('create', Kapal::class);
+
+        $user = request()->user();
+        $nelayanList = Nelayan::aktif()
+            ->when($user?->isAdminTpi(), fn ($query) => $query->where('tpi_id', $user->tpi_id))
+            ->orderBy('nama')
+            ->get();
 
         return view('master.kapal.create', compact('nelayanList'));
     }
@@ -59,10 +72,13 @@ class KapalController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Kapal::class);
+
+        $user = $request->user();
         $validated = $request->validate([
             'kode_kapal' => ['required', 'string', 'max:20', 'unique:kapal,kode_kapal'],
             'nama_kapal' => ['required', 'string', 'max:100'],
-            'nelayan_id' => ['nullable', 'exists:nelayan,id'],
+            'nelayan_id' => [Rule::requiredIf($user?->isAdminTpi()), 'nullable', 'exists:nelayan,id'],
             'jenis_kapal' => ['required', 'in:tanpa_motor,motor_tempel,kapal_motor'],
             'gt' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
             'no_sipi' => ['nullable', 'string', 'max:50'],
@@ -76,6 +92,10 @@ class KapalController extends Controller
             'gt.numeric' => 'Gross Tonnage (GT) harus berupa angka valid.',
             'nelayan_id.exists' => 'Pemilik kapal yang dipilih tidak valid.',
         ]);
+
+        if ($user?->isAdminTpi() && ! Nelayan::whereKey($validated['nelayan_id'])->where('tpi_id', $user->tpi_id)->exists()) {
+            abort(403, 'Kapal hanya dapat dikaitkan dengan nelayan pada TPI Anda.');
+        }
 
         $validated['is_active'] = $request->boolean('is_active', true);
 
@@ -89,7 +109,9 @@ class KapalController extends Controller
      */
     public function show(Kapal $kapal): RedirectResponse
     {
-        return redirect()->route('kapal.edit', $kapal);
+        $this->authorize('view', $kapal);
+
+        return redirect()->route('kapal.index');
     }
 
     /**
@@ -97,7 +119,13 @@ class KapalController extends Controller
      */
     public function edit(Kapal $kapal): View
     {
-        $nelayanList = Nelayan::aktif()->orderBy('nama')->get();
+        $this->authorize('update', $kapal);
+
+        $user = request()->user();
+        $nelayanList = Nelayan::aktif()
+            ->when($user?->isAdminTpi(), fn ($query) => $query->where('tpi_id', $user->tpi_id))
+            ->orderBy('nama')
+            ->get();
 
         return view('master.kapal.edit', compact('kapal', 'nelayanList'));
     }
@@ -107,10 +135,13 @@ class KapalController extends Controller
      */
     public function update(Request $request, Kapal $kapal): RedirectResponse
     {
+        $this->authorize('update', $kapal);
+
+        $user = $request->user();
         $validated = $request->validate([
             'kode_kapal' => ['required', 'string', 'max:20', Rule::unique('kapal', 'kode_kapal')->ignore($kapal->id)],
             'nama_kapal' => ['required', 'string', 'max:100'],
-            'nelayan_id' => ['nullable', 'exists:nelayan,id'],
+            'nelayan_id' => [Rule::requiredIf($user?->isAdminTpi()), 'nullable', 'exists:nelayan,id'],
             'jenis_kapal' => ['required', 'in:tanpa_motor,motor_tempel,kapal_motor'],
             'gt' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
             'no_sipi' => ['nullable', 'string', 'max:50'],
@@ -125,6 +156,10 @@ class KapalController extends Controller
             'nelayan_id.exists' => 'Pemilik kapal yang dipilih tidak valid.',
         ]);
 
+        if ($user?->isAdminTpi() && ! Nelayan::whereKey($validated['nelayan_id'])->where('tpi_id', $user->tpi_id)->exists()) {
+            abort(403, 'Kapal hanya dapat dikaitkan dengan nelayan pada TPI Anda.');
+        }
+
         $validated['is_active'] = $request->boolean('is_active');
 
         $kapal->update($validated);
@@ -137,6 +172,8 @@ class KapalController extends Controller
      */
     public function destroy(Kapal $kapal): RedirectResponse
     {
+        $this->authorize('delete', $kapal);
+
         if ($kapal->pendaratan()->exists()) {
             return redirect()->route('kapal.index')->with('error', "Kapal '{$kapal->nama_kapal}' tidak dapat dihapus karena memiliki riwayat transaksi pendaratan.");
         }

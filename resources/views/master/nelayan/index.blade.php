@@ -19,12 +19,14 @@
                 <i class="bi bi-people-fill text-primary"></i> Data Nelayan Terdaftar
             </h4>
         </div>
+        @can('create', \App\Models\Nelayan::class)
         <div>
             <a href="{{ route('nelayan.create') }}" class="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-3 py-2">
                 <i class="bi bi-person-plus-fill"></i>
                 <span class="fw-semibold">Tambah Nelayan Baru</span>
             </a>
         </div>
+        @endcan
     </div>
 
     <!-- Filter & Search Card -->
@@ -104,7 +106,9 @@
                         <th>Kelompok Nelayan (KUB)</th>
                         <th class="text-center" style="width: 110px;">Status</th>
                         <th class="text-center" style="width: 140px;">Kepemilikan</th>
+                        @can('create', \App\Models\Nelayan::class)
                         <th class="text-center" style="width: 140px;">Aksi</th>
+                        @endcan
                     </tr>
                 </thead>
                 <tbody>
@@ -155,33 +159,42 @@
                                 @endif
                             </td>
                             <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2 small">
+                                <div class="d-flex justify-content-center flex-wrap gap-2 small">
                                     <span class="badge bg-info-subtle text-info-emphasis" title="Jumlah Kapal Dimiliki">
                                         <i class="bi bi-tsunami me-1"></i>{{ $nelayan->kapal_count }} Kapal
+                                    </span>
+                                    <span class="badge bg-warning-subtle text-warning-emphasis" title="Jumlah Alat Tangkap Dimiliki">
+                                        <i class="bi bi-tools me-1"></i>{{ $nelayan->alat_tangkap_count }} Alat Tangkap
                                     </span>
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Riwayat Pendaratan">
                                         <i class="bi bi-journal-check me-1"></i>{{ $nelayan->pendaratan_count }} PDR
                                     </span>
                                 </div>
                             </td>
+                            @can('create', \App\Models\Nelayan::class)
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
+                                    @can('update', $nelayan)
                                     <a href="{{ route('nelayan.edit', $nelayan) }}" class="btn btn-sm btn-outline-warning text-dark" title="Edit Data">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    <form action="{{ route('nelayan.destroy', $nelayan) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus nelayan \'{{ $nelayan->nama }}\'? Data yang memiliki riwayat transaksi pendaratan atau kepemilikan kapal tidak dapat dihapus.');">
+                                    @endcan
+                                    @can('delete', $nelayan)
+                                    <form action="{{ route('nelayan.destroy', $nelayan) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus nelayan \'{{ $nelayan->nama }}\'? Data yang memiliki riwayat transaksi pendaratan atau kepemilikan kapal atau alat tangkap tidak dapat dihapus.');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus Data">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endcan
                                 </div>
                             </td>
+                            @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="{{ auth()->user()?->can('create', \App\Models\Nelayan::class) ? 8 : 7 }}" class="text-center py-5">
                                 <div class="text-muted">
                                     <i class="bi bi-people display-6 d-block mb-2"></i>
                                     <span class="fw-semibold">Tidak ada data nelayan ditemukan.</span>

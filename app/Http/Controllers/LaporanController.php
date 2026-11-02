@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ReportFilterRequest;
 use App\Models\DetailPendaratan;
 use App\Models\JenisIkan;
 use App\Models\Pendaratan;
@@ -13,14 +14,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class LaporanController extends Controller
 {
     /**
      * Display the reporting and aggregation hub.
      */
-    public function index(Request $request): View
+    public function index(ReportFilterRequest $request): View
     {
         $filters = $this->resolveFilters($request);
         $activeTab = $request->input('tab', 'tpi');
@@ -28,7 +29,8 @@ class LaporanController extends Controller
         // Master data options for filter selects
         $availableYears = $this->getAvailableYears();
         $tpis = $this->getAllowedTpis();
-        $kategoriList = ['Pelagis Besar', 'Pelagis Kecil', 'Demersal', 'Non-Ikan'];
+        $kategoriList = ['Pelagis Besar', 'Pelagis Kecil', 'Demersal', 'Non-Ikan', 'Lainnya'];
+        $reportGeneratedAt = Carbon::now();
 
         // Calculate data for all tabs to ensure responsive tab switching
         $rekapTpiData = $this->calculateRekapTpi($filters);
@@ -45,14 +47,15 @@ class LaporanController extends Controller
             'rekapTpiData',
             'rekapIkanData',
             'rekapDkpData',
-            'rekapTriwulanData'
+            'rekapTriwulanData',
+            'reportGeneratedAt'
         ));
     }
 
     /**
      * Dedicated rekap per TPI view or data endpoint.
      */
-    public function rekapTpi(Request $request): View
+    public function rekapTpi(ReportFilterRequest $request): View
     {
         $filters = $this->resolveFilters($request);
         $data = $this->calculateRekapTpi($filters);
@@ -65,13 +68,13 @@ class LaporanController extends Controller
     /**
      * Dedicated rekap per Jenis Ikan view or data endpoint.
      */
-    public function rekapIkan(Request $request): View
+    public function rekapIkan(ReportFilterRequest $request): View
     {
         $filters = $this->resolveFilters($request);
         $data = $this->calculateRekapIkan($filters);
         $availableYears = $this->getAvailableYears();
         $tpis = $this->getAllowedTpis();
-        $kategoriList = ['Pelagis Besar', 'Pelagis Kecil', 'Demersal', 'Non-Ikan'];
+        $kategoriList = ['Pelagis Besar', 'Pelagis Kecil', 'Demersal', 'Non-Ikan', 'Lainnya'];
 
         return view('laporan.rekap_ikan', compact('filters', 'data', 'availableYears', 'tpis', 'kategoriList'));
     }
@@ -79,7 +82,7 @@ class LaporanController extends Controller
     /**
      * Dedicated rekap standar DKP Bengkulu per Kabupaten/Kota.
      */
-    public function rekapDkp(Request $request): View
+    public function rekapDkp(ReportFilterRequest $request): View
     {
         $filters = $this->resolveFilters($request);
         $data = $this->calculateRekapDkp($filters);
@@ -89,15 +92,15 @@ class LaporanController extends Controller
     }
 
     /**
-     * Export clean CSV data formatted with UTF-8 BOM for Microsoft Excel.
+     * Export a formatted Excel-compatible spreadsheet.
      */
-    public function exportCsv(Request $request): StreamedResponse
+    public function exportExcel(ReportFilterRequest $request): Response
     {
         $filters = $this->resolveFilters($request);
         $tipe = $request->input('tipe', 'tpi');
         $tahun = $filters['tahun'];
 
-        $filename = sprintf('Laporan_%s_%s_%s.csv', strtoupper($tipe), $tahun, date('Ymd_His'));
+        $filename = sprintf('Laporan_%s_%s_%s.xls', strtoupper($tipe), $tahun, date('Ymd_His'));
 
         switch ($tipe) {
             case 'ikan':
@@ -113,7 +116,7 @@ class LaporanController extends Controller
                         $r['nama_lokal'],
                         $r['kategori'],
                         number_format($r['volume_kg'], 2, '.', ''),
-                        number_format($r['persentase'], 2, '.', '') . '%',
+                        number_format($r['persentase'], 2, '.', '').'%',
                         number_format($r['rata_rata_harga'], 0, '.', ''),
                         number_format($r['total_nilai'], 0, '.', ''),
                     ];
@@ -121,7 +124,7 @@ class LaporanController extends Controller
                 $totalsRow = [
                     'TOTAL',
                     '',
-                    $data['totals']['count'] . ' Komoditas',
+                    $data['totals']['count'].' Komoditas',
                     '',
                     '',
                     number_format($data['totals']['volume_kg'], 2, '.', ''),
@@ -146,7 +149,7 @@ class LaporanController extends Controller
                         number_format($r['total_volume'], 2, '.', ''),
                         number_format($r['total_nilai'], 0, '.', ''),
                         $r['komoditas_unggulan'],
-                        number_format($r['kontribusi_persen'], 2, '.', '') . '%',
+                        number_format($r['kontribusi_persen'], 2, '.', '').'%',
                     ];
                 }
                 $totalsRow = [
@@ -186,7 +189,7 @@ class LaporanController extends Controller
                 }
                 $totalsRow = [
                     'TOTAL',
-                    $data['totals']['count'] . ' TPI',
+                    $data['totals']['count'].' TPI',
                     '',
                     number_format($data['totals']['tw1_volume'], 2, '.', ''),
                     number_format($data['totals']['tw1_nilai'], 0, '.', ''),
@@ -222,7 +225,7 @@ class LaporanController extends Controller
                 $totalsRow = [
                     'TOTAL',
                     '',
-                    $data['totals']['count'] . ' TPI',
+                    $data['totals']['count'].' TPI',
                     '',
                     $data['totals']['frekuensi_pendaratan'],
                     number_format($data['totals']['total_volume'], 2, '.', ''),
@@ -232,47 +235,19 @@ class LaporanController extends Controller
                 break;
         }
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+        return response()->view('laporan.export_excel', compact('title', 'filters', 'columns', 'rows', 'totalsRow'), 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
-        ];
-
-        return response()->streamDownload(function () use ($title, $filters, $columns, $rows, $totalsRow) {
-            // Write UTF-8 BOM for Microsoft Excel compatibility
-            echo "\xEF\xBB\xBF";
-
-            $handle = fopen('php://output', 'w');
-
-            // Metadata Headers
-            fputcsv($handle, ['PEMERINTAH PROVINSI BENGKULU - DINAS KELAUTAN DAN PERIKANAN']);
-            fputcsv($handle, [$title]);
-            fputcsv($handle, ['Periode Laporan:', $filters['periode_label']]);
-            fputcsv($handle, ['Tanggal Unduh:', Carbon::now()->translatedFormat('d F Y H:i') . ' WIB']);
-            fputcsv($handle, ['Penyusun / Petugas:', Auth::user()->name ?? 'Petugas DKP']);
-            fputcsv($handle, []); // Empty line
-
-            // Column Header
-            fputcsv($handle, $columns);
-
-            // Data Rows
-            foreach ($rows as $row) {
-                fputcsv($handle, $row);
-            }
-
-            // Totals Row
-            fputcsv($handle, $totalsRow);
-
-            fclose($handle);
-        }, $filename, $headers);
+        ]);
     }
 
     /**
      * Dedicated printable view with official government header and signature blocks.
      */
-    public function cetak(Request $request): View
+    public function cetak(ReportFilterRequest $request): View
     {
         $filters = $this->resolveFilters($request);
         $tipe = $request->input('tipe', 'tpi');
@@ -662,7 +637,7 @@ class LaporanController extends Controller
                 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
             ];
-            $periodeLabel = ($monthNames[$bulan] ?? "Bulan {$bulan}") . " {$tahun}";
+            $periodeLabel = ($monthNames[$bulan] ?? "Bulan {$bulan}")." {$tahun}";
         } elseif ($periodeTipe === 'triwulanan' && $triwulan) {
             $triwulanLabels = [
                 1 => 'Triwulan I (Jan - Mar)',
@@ -670,7 +645,7 @@ class LaporanController extends Controller
                 3 => 'Triwulan III (Jul - Sep)',
                 4 => 'Triwulan IV (Okt - Des)',
             ];
-            $periodeLabel = ($triwulanLabels[$triwulan] ?? "Triwulan {$triwulan}") . " {$tahun}";
+            $periodeLabel = ($triwulanLabels[$triwulan] ?? "Triwulan {$triwulan}")." {$tahun}";
         }
 
         // TPI Name label for display
